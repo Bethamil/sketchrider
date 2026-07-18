@@ -7,4 +7,4 @@ Quick reference:
 
 - pnpm only, nothing global; every source file < 500 lines
 - `pnpm smoke` must pass before committing physics changes
-- `pnpm build` = icons + typecheck + production build
+- `pnpm build` = typecheck + production build

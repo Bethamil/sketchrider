@@ -1,7 +1,15 @@
-# SketchRider ✏️
+<p align="center">
+  <img src="docs/logo.png" alt="SketchRider" width="360" />
+</p>
 
-A modern, hand-drawn take on the classic Line Rider. Sketch a track, press
-play, and a ragdoll on a sled rides your line — powered by gravity alone.
+<p align="center">
+  A modern, hand-drawn take on the classic Line Rider. Sketch a track, press
+  play, and a ragdoll on a sled rides your line — powered by gravity alone.
+</p>
+
+<p align="center">
+  <a href="https://sketchrider.netlify.app"><strong>▶ Play it at sketchrider.netlify.app</strong></a>
+</p>
 
 - **Client-side only** — no backend, tracks autosave to localStorage
 - **Installable PWA** — works offline, on phone, iPad (Apple Pencil supported)
@@ -39,7 +47,7 @@ Tracks can be **saved to / loaded from JSON files** (toolbar) for sharing.
 ```sh
 pnpm install
 pnpm dev        # dev server
-pnpm build      # icons + typecheck + production build (dist/)
+pnpm build      # typecheck + production build (dist/)
 pnpm smoke      # headless physics regression tests
 pnpm preview    # serve the production build
 ```
@@ -61,7 +69,6 @@ src/
   state/     undo/redo history, localStorage + file import/export
   ui/        DOM toolbar
 scripts/
-  gen-icons.mjs   dependency-free PNG icon generator (pure node zlib)
   smoke.ts        headless physics scenarios (slope, rest, boost, crash)
 ```
 

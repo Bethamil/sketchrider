@@ -3,6 +3,5 @@ dist/
 .netlify/
 .smoke/
 dev-dist/
-public/icons/
 .DS_Store
 *.local

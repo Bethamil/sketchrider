@@ -4,11 +4,10 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm icons && vite",
-    "build": "pnpm icons && pnpm typecheck && vite build",
+    "dev": "vite",
+    "build": "pnpm typecheck && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
-    "icons": "node scripts/gen-icons.mjs",
     "smoke": "vite build --ssr scripts/smoke.ts --outDir .smoke --emptyOutDir --logLevel warn && node .smoke/smoke.js"
   },
   "devDependencies": {

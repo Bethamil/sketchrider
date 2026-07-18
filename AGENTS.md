@@ -61,8 +61,10 @@ with Vite, installable PWA, fully client-side.
 - **Sketch aesthetic is deterministic**: stroke jitter is seeded per line id
   (`src/render/sketch.ts`) so nothing boils frame to frame. No network
   fonts — the handwriting look comes from a local font stack.
-- **PWA icons are generated**, not checked in: `scripts/gen-icons.mjs` is a
-  dependency-free PNG encoder (node zlib), wired into `pnpm build`.
+- **Icons and logo are static artwork**, checked into git: the source logo
+  lives in `docs/logo.png` (also used in the README), the favicon and PWA
+  icons in `public/favicon.png` + `public/icons/`. They were cut from
+  hand-picked artwork — don't regenerate them programmatically.
 - **Deploy target is Netlify** (`netlify.toml`): build `pnpm build`,
   publish `dist/`.
 
