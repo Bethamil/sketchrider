@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.smoke/
+dev-dist/
+public/icons/
+.DS_Store
+*.local
