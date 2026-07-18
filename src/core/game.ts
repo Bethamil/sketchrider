@@ -56,9 +56,6 @@ export class Game {
     this.rider.reset(this.spawn.x, this.spawn.y);
     this.mode = 'play';
     this.paused = false;
-    // Every run starts at normal speed — a sticky 2x from a previous run
-    // reads as "the game is randomly faster today".
-    this.speed = 1;
     this.rewinding = false;
     this.acc = 0;
     this.rewindAcc = 0;
@@ -97,7 +94,6 @@ export class Game {
     this.runTimeMs = 0;
     this.paused = false;
     this.rewinding = false;
-    this.speed = 1;
     this.tape.length = 0;
     this.onModeChange?.();
   }
