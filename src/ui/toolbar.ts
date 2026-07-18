@@ -40,6 +40,10 @@ const ICONS = {
   ),
   undo: I('<path d="M7.5 6.5L4 10l3.5 3.5"/><path d="M4.5 10h9c3.3 0 6 2.7 6 6v1.5"/>'),
   redo: I('<path d="M16.5 6.5L20 10l-3.5 3.5"/><path d="M19.5 10h-9c-3.3 0-6 2.7-6 6v1.5"/>'),
+  dots: I(
+    '<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>',
+    true,
+  ),
   trash: I(
     '<path d="M5.5 7.5l1 12.2c.1.7.6 1.3 1.3 1.3h8.4c.7 0 1.2-.6 1.3-1.3l1-12.2"/><path d="M3.5 7h17M9.5 7V4.5c0-.6.4-1 1-1h3c.6 0 1 .4 1 1V7"/><path d="M10 11l.3 6M14 11l-.3 6"/>',
   ),
@@ -69,18 +73,30 @@ const ICONS = {
 const squiggle = (color: string): string =>
   `<svg viewBox="0 0 32 12" fill="none"><path d="M2 8c5-5 8 3 13-2s8 2 15-3" stroke="${color}" stroke-width="2.5" stroke-linecap="round"/></svg>`;
 
+/**
+ * UI, split by intent:
+ *  - bottom: the edit bar — tools, line chips, undo/redo, and a "⋯" menu
+ *    holding the rare file actions (save / load / clear). Stays up while
+ *    riding too — you can keep sketching mid-run.
+ *  - top right: the transport bar, always shown in full. The red main
+ *    button is play in edit mode and becomes pause/resume during a run;
+ *    the run-only controls disable while editing.
+ */
 export class Toolbar {
-  private bar!: HTMLDivElement;
+  private dock!: HTMLDivElement;
+  private editBar!: HTMLDivElement;
+  private transportBar!: HTMLDivElement;
+  private menuWrap!: HTMLElement;
+  private menu!: HTMLDivElement;
+  private menuBtn!: HTMLButtonElement;
   private toolBtns = new Map<string, HTMLButtonElement>();
   private chipBtns = new Map<string, HTMLButtonElement>();
-  private editOnly: HTMLElement[] = [];
-  private playOnly: HTMLElement[] = [];
   private undoBtn!: HTMLButtonElement;
   private redoBtn!: HTMLButtonElement;
-  private trashBtn!: HTMLButtonElement;
-  private playBtn!: HTMLButtonElement;
-  private pauseBtn!: HTMLButtonElement;
+  private clearItem!: HTMLButtonElement;
+  private mainBtn!: HTMLButtonElement;
   private fastBtn!: HTMLButtonElement;
+  private runOnly: HTMLButtonElement[] = [];
   private confirmUntil = 0;
 
   constructor(
@@ -94,8 +110,9 @@ export class Toolbar {
   refresh(): void {
     const a = this.actions;
     const playing = a.getMode() === 'play';
-    for (const el of this.editOnly) el.classList.toggle('gone', playing);
-    for (const el of this.playOnly) el.classList.toggle('gone', !playing);
+    this.menuWrap.classList.toggle('gone', playing);
+    if (playing) this.closeMenu();
+
     for (const [id, btn] of this.toolBtns) {
       btn.classList.toggle('active', a.getToolId() === id);
     }
@@ -104,10 +121,13 @@ export class Toolbar {
     }
     this.undoBtn.disabled = !a.canUndo();
     this.redoBtn.disabled = !a.canRedo();
-    this.pauseBtn.innerHTML = a.isPaused() ? ICONS.play : ICONS.pause;
-    this.pauseBtn.title = a.isPaused() ? 'Resume (p)' : 'Pause (p)';
+
+    for (const btn of this.runOnly) btn.disabled = !playing;
+    const showPlay = !playing || a.isPaused();
+    this.mainBtn.innerHTML = showPlay ? ICONS.play : ICONS.pause;
+    this.mainBtn.title = !playing ? 'Play (space)' : a.isPaused() ? 'Resume (p)' : 'Pause (p)';
     this.fastBtn.classList.toggle('active', a.isFast());
-    if (Date.now() > this.confirmUntil) this.trashBtn.classList.remove('confirm');
+    if (Date.now() > this.confirmUntil) this.resetClearItem();
   }
 
   private build(): void {
@@ -118,10 +138,27 @@ export class Toolbar {
       '<div class="tagline">draw a track &middot; press play &middot; gravity does the rest</div>';
     this.root.appendChild(brand);
 
-    this.bar = document.createElement('div');
-    this.bar.className = 'bar';
+    this.dock = document.createElement('div');
+    this.dock.className = 'dock';
+    this.root.appendChild(this.dock);
 
-    // Tools — always available, also while riding or paused.
+    this.buildTransportBar();
+    this.buildEditBar();
+
+    document.addEventListener('pointerdown', (e) => {
+      if (!this.menu.classList.contains('gone') && !this.menu.parentElement!.contains(e.target as Node)) {
+        this.closeMenu();
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.closeMenu();
+    });
+  }
+
+  private buildEditBar(): void {
+    this.editBar = document.createElement('div');
+    this.editBar.className = 'bar editbar';
+
     for (const [id, icon, title] of [
       ['draw', ICONS.pencil, 'Draw (d)'],
       ['erase', ICONS.eraser, 'Erase (e)'],
@@ -129,10 +166,10 @@ export class Toolbar {
     ] as const) {
       const btn = this.btn(icon, title, () => this.actions.setTool(id));
       this.toolBtns.set(id, btn);
-      this.bar.appendChild(btn);
+      this.editBar.appendChild(btn);
     }
 
-    this.divider();
+    this.divider(this.editBar);
 
     for (const def of allLineTypes()) {
       const btn = document.createElement('button');
@@ -144,51 +181,113 @@ export class Toolbar {
         this.refresh();
       });
       this.chipBtns.set(def.id, btn);
-      this.bar.appendChild(btn);
+      this.editBar.appendChild(btn);
     }
 
-    this.divider();
+    this.divider(this.editBar);
 
     this.undoBtn = this.btn(ICONS.undo, 'Undo (⌘Z)', () => this.actions.undo());
     this.redoBtn = this.btn(ICONS.redo, 'Redo (⇧⌘Z)', () => this.actions.redo());
-    this.bar.append(this.undoBtn, this.redoBtn);
+    this.editBar.append(this.undoBtn, this.redoBtn);
 
-    this.trashBtn = this.btn(ICONS.trash, 'Clear track (tap twice)', () => this.confirmClear());
-    this.trashBtn.classList.add('danger');
-    const saveBtn = this.btn(ICONS.save, 'Save track to file', () => this.actions.exportTrack());
-    const loadBtn = this.btn(ICONS.load, 'Load track from file', () => this.actions.importTrack());
-    this.bar.append(this.trashBtn, saveBtn, loadBtn);
-    this.editOnly.push(this.trashBtn, saveBtn, loadBtn);
+    this.menuWrap = this.buildMenu();
+    this.editBar.appendChild(this.menuWrap);
+    this.dock.appendChild(this.editBar);
+  }
 
-    this.divider();
+  /** The "⋯" popover holding the rare, destructive-ish file actions. */
+  private buildMenu(): HTMLElement {
+    const wrap = document.createElement('span');
+    wrap.className = 'menuwrap';
 
-    // Transport: play in edit mode; stop/rewind/pause/fast/restart while riding.
-    this.playBtn = this.btn(ICONS.play, 'Play (space)', () => this.actions.play());
-    this.playBtn.classList.add('play');
-    this.bar.appendChild(this.playBtn);
-    this.editOnly.push(this.playBtn);
+    this.menuBtn = document.createElement('button');
+    this.menuBtn.className = 'tbtn';
+    this.menuBtn.title = 'Track menu';
+    this.menuBtn.innerHTML = ICONS.dots;
+    this.menuBtn.addEventListener('click', () => {
+      this.menu.classList.toggle('gone');
+      this.menuBtn.classList.toggle('active', !this.menu.classList.contains('gone'));
+      this.resetClearItem();
+    });
+
+    this.menu = document.createElement('div');
+    this.menu.className = 'menu gone';
+
+    const item = (icon: string, label: string, onClick: () => void): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.className = 'mitem';
+      b.innerHTML = icon + `<span>${label}</span>`;
+      b.addEventListener('click', onClick);
+      this.menu.appendChild(b);
+      return b;
+    };
+
+    item(ICONS.save, 'Save track to file', () => {
+      this.actions.exportTrack();
+      this.closeMenu();
+    });
+    item(ICONS.load, 'Load track from file', () => {
+      this.actions.importTrack();
+      this.closeMenu();
+    });
+    this.clearItem = item(ICONS.trash, 'Clear track', () => this.confirmClear());
+    this.clearItem.classList.add('danger');
+
+    wrap.append(this.menuBtn, this.menu);
+    return wrap;
+  }
+
+  private buildTransportBar(): void {
+    this.transportBar = document.createElement('div');
+    this.transportBar.className = 'bar transport';
 
     const stopBtn = this.btn(ICONS.stop, 'Back to drawing (space)', () => this.actions.stop());
-    const rewBtn = this.holdBtn(ICONS.rewind, 'Rewind — hold (←)');
-    this.pauseBtn = this.btn(ICONS.pause, 'Pause (p)', () => this.actions.togglePause());
-    this.fastBtn = this.btn(ICONS.fast, 'Fast-forward 2x (f)', () => this.actions.toggleFast());
-    const restartBtn = this.btn(ICONS.restart, 'Restart run (r)', () => this.actions.restart());
-    this.bar.append(stopBtn, rewBtn, this.pauseBtn, this.fastBtn, restartBtn);
-    this.playOnly.push(stopBtn, rewBtn, this.pauseBtn, this.fastBtn, restartBtn);
+    this.transportBar.appendChild(stopBtn);
 
-    this.root.appendChild(this.bar);
+    this.divider(this.transportBar);
+
+    const rewBtn = this.holdBtn(ICONS.rewind, 'Rewind — hold (←)');
+    this.mainBtn = this.btn(ICONS.play, 'Play (space)', () => {
+      if (this.actions.getMode() === 'edit') this.actions.play();
+      else this.actions.togglePause();
+    });
+    this.mainBtn.classList.add('main');
+    this.fastBtn = this.btn(ICONS.fast, 'Fast-forward 2x (f)', () => this.actions.toggleFast());
+    this.transportBar.append(rewBtn, this.mainBtn, this.fastBtn);
+
+    this.divider(this.transportBar);
+
+    const restartBtn = this.btn(ICONS.restart, 'Restart run (r)', () => this.actions.restart());
+    this.transportBar.appendChild(restartBtn);
+
+    this.runOnly.push(stopBtn, rewBtn, this.fastBtn, restartBtn);
+    this.root.appendChild(this.transportBar);
+  }
+
+  private closeMenu(): void {
+    this.menu.classList.add('gone');
+    this.menuBtn.classList.remove('active');
+    this.resetClearItem();
   }
 
   private confirmClear(): void {
     if (Date.now() < this.confirmUntil) {
       this.confirmUntil = 0;
       this.actions.clearTrack();
+      this.closeMenu();
       this.refresh();
       return;
     }
-    this.confirmUntil = Date.now() + 2000;
-    this.trashBtn.classList.add('confirm');
-    setTimeout(() => this.refresh(), 2100);
+    this.confirmUntil = Date.now() + 2500;
+    this.clearItem.classList.add('confirm');
+    this.clearItem.querySelector('span')!.textContent = 'Tap again to clear';
+    setTimeout(() => this.refresh(), 2600);
+  }
+
+  private resetClearItem(): void {
+    this.confirmUntil = 0;
+    this.clearItem.classList.remove('confirm');
+    this.clearItem.querySelector('span')!.textContent = 'Clear track';
   }
 
   private btn(icon: string, title: string, onClick: () => void): HTMLButtonElement {
@@ -224,9 +323,9 @@ export class Toolbar {
     return b;
   }
 
-  private divider(): void {
+  private divider(parent: HTMLElement): void {
     const d = document.createElement('span');
     d.className = 'divider';
-    this.bar.appendChild(d);
+    parent.appendChild(d);
   }
 }

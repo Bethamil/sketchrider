@@ -1,13 +1,16 @@
 import { mulberry32 } from '../core/math';
 import type { TrackLine } from '../lines/store';
 
+/** Anything path segments can be appended to: a live 2D context or a cached Path2D. */
+export type PathSink = Pick<CanvasRenderingContext2D, 'moveTo' | 'lineTo' | 'quadraticCurveTo'>;
+
 /**
  * Hand-drawn stroke helpers. Every line is rendered as a slightly bowed
  * quadratic with jittered, overshooting endpoints — jitter is seeded per
  * line id so the sketch is stable frame to frame.
  */
 export function addSketchStroke(
-  ctx: CanvasRenderingContext2D,
+  ctx: PathSink,
   l: TrackLine,
   wobble = 1,
   seedOffset = 0,
@@ -27,7 +30,7 @@ export function addSketchStroke(
 }
 
 /** Direction arrows drawn along boost lines. */
-export function addChevrons(ctx: CanvasRenderingContext2D, l: TrackLine): void {
+export function addChevrons(ctx: PathSink, l: TrackLine): void {
   const spacing = 26;
   const size = 4.5;
   const count = Math.max(1, Math.floor(l.len / spacing));

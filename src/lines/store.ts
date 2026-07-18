@@ -39,6 +39,8 @@ export class LineStore {
   private lines = new Map<number, TrackLine>();
   private grid = new Map<string, TrackLine[]>();
   nextId = 1;
+  /** Bumped on every mutation — cheap cache invalidation for the renderer. */
+  version = 0;
   /** Called after any mutation — used for autosave. */
   onMutate: (() => void) | null = null;
 
@@ -75,6 +77,7 @@ export class LineStore {
       if (i >= 0) bucket.splice(i, 1);
       if (bucket.length === 0) this.grid.delete(key);
     }
+    this.version++;
     this.onMutate?.();
     return line;
   }
@@ -82,6 +85,7 @@ export class LineStore {
   clear(): void {
     this.lines.clear();
     this.grid.clear();
+    this.version++;
     this.onMutate?.();
   }
 
@@ -135,6 +139,7 @@ export class LineStore {
   loadJSON(data: any): void {
     this.lines.clear();
     this.grid.clear();
+    this.version++;
     if (!data || !Array.isArray(data.lines)) return;
     for (const raw of data.lines) {
       const line = makeLine(raw.id, raw.t, raw.x1, raw.y1, raw.x2, raw.y2);
@@ -153,6 +158,7 @@ export class LineStore {
       }
       bucket.push(line);
     }
+    this.version++;
     this.onMutate?.();
   }
 

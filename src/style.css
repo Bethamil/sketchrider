@@ -73,26 +73,127 @@ body {
 
 /* ---- toolbar ------------------------------------------------------ */
 
-.bar {
+.dock {
   position: fixed;
   left: 50%;
   bottom: calc(12px + env(safe-area-inset-bottom));
-  transform: translateX(-50%) rotate(-0.4deg);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  /* Shrink-to-fit against left: 50% would cap the bar at half the
+     viewport and force early wrapping — size to content instead. */
+  width: max-content;
+  max-width: calc(100vw - 14px);
+}
+
+.bar {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   gap: 4px;
-  max-width: calc(100vw - 14px);
+  max-width: 100%;
   padding: 7px 10px;
   background: var(--paper-raised);
   border: 1.7px solid var(--ink);
   border-radius: 16px 19px 15px 20px / 20px 15px 19px 16px;
   box-shadow: 3px 4px 0 rgba(42, 46, 54, 0.15);
+  transform: rotate(-0.4deg);
 }
 
-.bar .gone {
-  display: none;
+/* Playback lives top right: the play button in edit mode, the transport
+   bar during a run. */
+.bar.transport {
+  position: fixed;
+  top: calc(12px + env(safe-area-inset-top));
+  right: calc(16px + env(safe-area-inset-right));
+  transform: rotate(0.5deg);
+}
+
+.gone {
+  display: none !important;
+}
+
+.bar.transport {
+  gap: 6px;
+  padding: 8px 12px;
+}
+
+.bar.transport .tbtn.main {
+  width: 52px;
+  height: 52px;
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--ink);
+  box-shadow: 2px 3px 0 rgba(42, 46, 54, 0.22);
+}
+
+.bar.transport .tbtn.main:active {
+  transform: translateY(2px) scale(0.95);
+  box-shadow: 1px 1px 0 rgba(42, 46, 54, 0.22);
+}
+
+.bar.transport .tbtn.main svg {
+  width: 24px;
+  height: 24px;
+}
+
+/* ---- "⋯" track menu ------------------------------------------------ */
+
+.menuwrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.menu {
+  position: absolute;
+  bottom: calc(100% + 14px);
+  right: -8px;
+  min-width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px;
+  background: var(--paper-raised);
+  border: 1.7px solid var(--ink);
+  border-radius: 14px 17px 13px 18px / 18px 13px 17px 14px;
+  box-shadow: 3px 4px 0 rgba(42, 46, 54, 0.15);
+  transform: rotate(0.4deg);
+}
+
+.mitem {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 9px 12px 10px 13px / 12px 10px 13px 9px;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mitem svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
+.mitem.danger {
+  color: var(--accent);
+}
+
+.mitem.danger.confirm {
+  background: var(--accent);
+  color: #fff;
 }
 
 .divider {
@@ -130,8 +231,16 @@ body {
   pointer-events: none;
 }
 
-.tbtn:hover {
-  border-color: rgba(42, 46, 54, 0.35);
+/* Hover affordances only where hover exists — otherwise taps leave
+   sticky highlight states on touch screens. */
+@media (hover: hover) {
+  .tbtn:hover {
+    border-color: rgba(42, 46, 54, 0.35);
+  }
+
+  .mitem:hover {
+    background: rgba(42, 46, 54, 0.08);
+  }
 }
 
 .tbtn:active {
@@ -176,27 +285,6 @@ body {
   transform: rotate(-1deg);
 }
 
-/* play + danger */
-
-.tbtn.play {
-  width: 54px;
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--ink);
-  box-shadow: 2px 3px 0 rgba(42, 46, 54, 0.28);
-}
-
-.tbtn.play:active {
-  transform: translateY(2px) scale(0.95);
-  box-shadow: 1px 1px 0 rgba(42, 46, 54, 0.28);
-}
-
-.tbtn.danger.confirm {
-  background: var(--accent);
-  color: #fff;
-  transform: rotate(-2deg);
-}
-
 .runlbl {
   padding: 0 8px 0 4px;
   font-size: 12px;
@@ -226,5 +314,71 @@ body {
 
   .runlbl {
     display: none;
+  }
+
+  .bar.transport {
+    top: calc(10px + env(safe-area-inset-top));
+    right: calc(10px + env(safe-area-inset-right));
+    gap: 3px;
+    padding: 6px 8px;
+  }
+
+  .bar.transport .tbtn.main {
+    width: 46px;
+    height: 46px;
+  }
+
+  .divider {
+    margin: 4px 3px;
+  }
+}
+
+/* Phones: everything compact. The transport bar shares the top edge with
+   the brand, chips drop their labels, and buttons shrink a step. */
+@media (max-width: 480px) {
+  .brand h1 {
+    font-size: 15px;
+  }
+
+  .brand {
+    left: 10px;
+  }
+
+  .tbtn {
+    width: 37px;
+    height: 37px;
+  }
+
+  .tbtn svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .tbtn.chip {
+    min-width: 37px;
+    padding: 4px 5px;
+  }
+
+  .tbtn.chip .lbl {
+    display: none;
+  }
+
+  .tbtn.chip svg {
+    width: 26px;
+    height: 12px;
+  }
+
+  .bar {
+    gap: 3px;
+    padding: 6px 8px;
+  }
+
+  .bar.transport .tbtn.main {
+    width: 42px;
+    height: 42px;
+  }
+
+  .menu {
+    right: -40px;
   }
 }

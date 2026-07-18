@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm icons && vite",
     "build": "pnpm icons && pnpm typecheck && vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

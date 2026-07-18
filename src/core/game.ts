@@ -32,6 +32,7 @@ export class Game {
   renderFrame: (() => void) | null = null;
 
   private acc = 0;
+  private rewindAcc = 0;
   private lastT = 0;
   private editCam = { x: 0, y: 0, zoom: 1 };
   /** One rider snapshot per physics step, so rewind is a true scrub. */
@@ -57,6 +58,7 @@ export class Game {
     this.paused = false;
     this.rewinding = false;
     this.acc = 0;
+    this.rewindAcc = 0;
     this.runTimeMs = 0;
     this.tape.length = 0;
     this.onModeChange?.();
@@ -88,6 +90,7 @@ export class Game {
     if (this.mode !== 'play') return;
     this.rider.reset(this.spawn.x, this.spawn.y);
     this.acc = 0;
+    this.rewindAcc = 0;
     this.runTimeMs = 0;
     this.paused = false;
     this.rewinding = false;
@@ -104,7 +107,10 @@ export class Game {
   setRewinding(on: boolean): void {
     if (this.mode !== 'play') return;
     this.rewinding = on;
-    if (on) this.paused = true;
+    if (on) {
+      this.paused = true;
+      this.rewindAcc = 0;
+    }
     this.onModeChange?.();
   }
 
@@ -119,14 +125,19 @@ export class Game {
   private tick = (t: number): void => {
     const dt = Math.min(t - this.lastT, 100);
     this.lastT = t;
+    // How far we are between fixed steps; rendering interpolates with it so
+    // motion stays smooth on displays faster (or slower) than 60 Hz.
+    let alpha = 1;
     if (this.mode === 'play') {
       if (this.rewinding) {
-        // Scrub backwards at 2x, following the rider back up the track.
-        for (let i = 0; i < 2 && this.tape.length > 0; i++) {
+        // Scrub backwards at 2x real time, whatever the display refresh rate.
+        this.rewindAcc += dt * 2;
+        while (this.rewindAcc >= STEP_MS) {
+          this.rewindAcc -= STEP_MS;
+          if (this.tape.length === 0) break;
           this.rider.restore(this.tape.pop()!);
           this.runTimeMs = Math.max(0, this.runTimeMs - STEP_MS);
         }
-        this.followCamera();
       } else if (!this.paused) {
         this.acc += dt * this.speed;
         const cap = STEP_MS * 5 * this.speed;
@@ -135,27 +146,34 @@ export class Game {
           this.acc -= STEP_MS;
           this.step();
         }
+        alpha = this.acc / STEP_MS;
       }
+      this.rider.beginLerp(alpha);
+      this.followCamera(dt);
     }
     this.renderFrame?.();
+    this.rider.endLerp();
     requestAnimationFrame(this.tick);
   };
 
   private step(): void {
+    this.rider.capturePrev();
     this.tape.push(this.rider.snapshot());
     if (this.tape.length > Game.TAPE_MAX) this.tape.splice(0, 3600);
     const snapped = this.engine.step(this.rider.allPoints, this.rider.sticks, this.store);
     if (snapped || this.rider.checkWipeout(this.engine.contacts)) this.rider.crash();
     this.rider.updateScarf();
     this.runTimeMs += STEP_MS;
-    this.followCamera();
   }
 
-  private followCamera(): void {
+  /** Ease toward the rider once per rendered frame, dt-corrected so the
+   *  camera feel is identical at any frame rate. */
+  private followCamera(dt: number): void {
     const r = this.rider;
     const tx = r.comX + r.velX * 14;
     const ty = r.comY + r.velY * 14;
-    this.camera.x = lerp(this.camera.x, tx, 0.1);
-    this.camera.y = lerp(this.camera.y, ty, 0.1);
+    const k = 1 - Math.pow(0.9, dt / STEP_MS);
+    this.camera.x = lerp(this.camera.x, tx, k);
+    this.camera.y = lerp(this.camera.y, ty, k);
   }
 }

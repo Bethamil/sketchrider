@@ -1,5 +1,6 @@
 node_modules/
 dist/
+.netlify/
 .smoke/
 dev-dist/
 public/icons/

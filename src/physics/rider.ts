@@ -36,6 +36,11 @@ export class Rider {
   readonly scarf: ScarfNode[] = [];
   crashed = false;
 
+  /** Positions at the start of the last step — the render-interpolation baseline. */
+  private prevState!: Float32Array;
+  private lerpSave!: Float32Array;
+  private lerping = false;
+
   constructor() {
     const p = {} as Record<RiderPointName, PPoint>;
     for (const name of Object.keys(OFFSETS) as RiderPointName[]) {
@@ -66,6 +71,9 @@ export class Rider {
     for (let i = 0; i < SCARF_NODES; i++) {
       this.scarf.push({ x: 0, y: 0, px: 0, py: 0 });
     }
+    const n = (this.allPoints.length + this.scarf.length) * 4;
+    this.prevState = new Float32Array(n);
+    this.lerpSave = new Float32Array(n);
     this.reset(0, 0);
   }
 
@@ -85,6 +93,76 @@ export class Rider {
       const n = this.scarf[i];
       n.x = n.px = sh.x - (i + 1) * SCARF_REST;
       n.y = n.py = sh.y + 2;
+    }
+    this.capturePrev();
+  }
+
+  private writeState(out: Float32Array): void {
+    let i = 0;
+    for (const p of this.allPoints) {
+      out[i++] = p.x;
+      out[i++] = p.y;
+      out[i++] = p.px;
+      out[i++] = p.py;
+    }
+    for (const n of this.scarf) {
+      out[i++] = n.x;
+      out[i++] = n.y;
+      out[i++] = n.px;
+      out[i++] = n.py;
+    }
+  }
+
+  /** Record the current positions as the interpolation baseline. Call right before each physics step. */
+  capturePrev(): void {
+    this.writeState(this.prevState);
+  }
+
+  /**
+   * Temporarily blend every position between the pre-step baseline (alpha 0)
+   * and the current state (alpha 1), so rendering between fixed steps is
+   * smooth on displays faster than 60 Hz. Physics state is untouched:
+   * endLerp() restores it and MUST run before the next step.
+   */
+  beginLerp(alpha: number): void {
+    if (alpha >= 1 || this.lerping) return;
+    this.writeState(this.lerpSave);
+    this.lerping = true;
+    const prev = this.prevState;
+    const b = 1 - alpha;
+    let i = 0;
+    for (const p of this.allPoints) {
+      p.x = prev[i] * b + p.x * alpha;
+      p.y = prev[i + 1] * b + p.y * alpha;
+      p.px = prev[i + 2] * b + p.px * alpha;
+      p.py = prev[i + 3] * b + p.py * alpha;
+      i += 4;
+    }
+    for (const n of this.scarf) {
+      n.x = prev[i] * b + n.x * alpha;
+      n.y = prev[i + 1] * b + n.y * alpha;
+      n.px = prev[i + 2] * b + n.px * alpha;
+      n.py = prev[i + 3] * b + n.py * alpha;
+      i += 4;
+    }
+  }
+
+  endLerp(): void {
+    if (!this.lerping) return;
+    this.lerping = false;
+    const save = this.lerpSave;
+    let i = 0;
+    for (const p of this.allPoints) {
+      p.x = save[i++];
+      p.y = save[i++];
+      p.px = save[i++];
+      p.py = save[i++];
+    }
+    for (const n of this.scarf) {
+      n.x = save[i++];
+      n.y = save[i++];
+      n.px = save[i++];
+      n.py = save[i++];
     }
   }
 
@@ -163,6 +241,7 @@ export class Rider {
     }
     this.crashed = snap[i++] === 1;
     for (const s of this.sticks) s.broken = snap[i++] === 1;
+    this.capturePrev();
   }
 
   /** Tear every mount: the figure separates from the sled. */

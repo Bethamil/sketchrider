@@ -34,6 +34,21 @@ with Vite, installable PWA, fully client-side.
   scenery.
 - **Rewind is a tape**, not reverse simulation: every step snapshots the
   rider (`Rider.snapshot/restore`), rewind pops snapshots.
+- **Rendering is decoupled from the 60 Hz sim.** The rider is drawn at
+  positions interpolated between fixed steps (`Rider.beginLerp/endLerp`,
+  alpha from the game loop accumulator) and the camera eases once per
+  rendered frame, dt-corrected — this is what makes 120 Hz displays smooth
+  and keeps browsers with slower canvases from drifting into slow motion.
+  Never render raw step positions or move camera easing back into `step()`.
+- **Track strokes are cached as `Path2D`** per line type (renderer), rebuilt
+  only when `LineStore.version` changes; the grid is one repeating pattern
+  fill. Don't reintroduce per-frame path building — it was the main perf
+  cost (and the cause of Firefox running slower than Chrome).
+- **UI layout:** the transport bar lives top right and is always shown in
+  full — the red main button is play in edit mode and pause/resume during
+  a run, run-only controls disable while editing. The bottom edit bar stays
+  visible while riding so tracks can be edited mid-run; rare file actions
+  live in the "⋯" menu.
 - **World units = px at zoom 1, y grows downward.** Lines are one-sided:
   ridable side up when drawn left-to-right.
 - **Sketch aesthetic is deterministic**: stroke jitter is seeded per line id
