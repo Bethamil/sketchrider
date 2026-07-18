@@ -19,8 +19,11 @@ export type RiderPointName = keyof typeof OFFSETS;
 
 const SCARF_NODES = 7;
 const SCARF_REST = 6.5;
-const SCARF_GRAVITY = 0.04;
+const SCARF_GRAVITY = 0.03;
 const SCARF_DRAG = 0.92;
+/** Gentle tailwind so the scarf streams back like the logo instead of
+ *  drooping through the body. Purely visual. */
+const SCARF_WIND = 0.06;
 
 interface ScarfNode {
   x: number;
@@ -91,11 +94,12 @@ export class Rider {
       pt.px = pt.x - 0.7;
     }
     for (const s of this.sticks) s.broken = false;
-    const sh = this.points.shoulder;
     for (let i = 0; i < this.scarf.length; i++) {
+      // Drape down and back at rest, so the scarf doesn't render as a stiff
+      // horizontal bar before the first simulation step moves it.
       const n = this.scarf[i];
-      n.x = n.px = sh.x - (i + 1) * SCARF_REST;
-      n.y = n.py = sh.y + 2;
+      n.x = n.px = this.neckX - (i + 1) * SCARF_REST * 0.32;
+      n.y = n.py = this.neckY + (i + 1) * SCARF_REST * 0.88;
     }
     this.capturePrev();
   }
@@ -274,20 +278,38 @@ export class Rider {
     return h.y - h.py;
   }
 
-  /** Purely visual verlet chain hanging from the shoulder. */
+  /** Neck point the scarf hangs from (between shoulder and head). */
+  get neckX(): number {
+    const p = this.points;
+    return p.shoulder.x + (p.head.x - p.shoulder.x) * 0.35;
+  }
+
+  get neckY(): number {
+    const p = this.points;
+    return p.shoulder.y + (p.head.y - p.shoulder.y) * 0.35;
+  }
+
+  /** Purely visual verlet chain streaming from the neck. */
   updateScarf(): void {
-    const sh = this.points.shoulder;
+    // Backward-along-the-sled direction drives the tailwind.
+    const t = this.points.tail;
+    const no = this.points.nose;
+    let bx = t.x - no.x;
+    let by = t.y - no.y;
+    const bl = len2d(bx, by) || 1;
+    bx /= bl;
+    by /= bl;
     for (const n of this.scarf) {
       const vx = (n.x - n.px) * SCARF_DRAG;
       const vy = (n.y - n.py) * SCARF_DRAG;
       n.px = n.x;
       n.py = n.y;
-      n.x += vx;
-      n.y += vy + SCARF_GRAVITY;
+      n.x += vx + bx * SCARF_WIND;
+      n.y += vy + SCARF_GRAVITY + by * SCARF_WIND;
     }
     for (let pass = 0; pass < 2; pass++) {
-      let ax = sh.x;
-      let ay = sh.y;
+      let ax = this.neckX;
+      let ay = this.neckY;
       for (const n of this.scarf) {
         const dx = n.x - ax;
         const dy = n.y - ay;
