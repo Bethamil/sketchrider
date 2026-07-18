@@ -22,6 +22,13 @@ with Vite, installable PWA, fully client-side.
   Line Rider: point masses, stick constraints, 6 solver iterations, one-sided
   swept line collision (no tunneling at speed). Constants live in
   `src/physics/engine.ts`.
+- **Physics must be cross-browser deterministic.** Never use `Math.hypot`,
+  trig, `Math.pow` or other non-correctly-rounded Math functions in any code
+  that feeds the sim (engine, rider, line geometry in the store) — they
+  differ between V8 and SpiderMonkey and the divergence compounds until the
+  same track crashes in one browser and not the other. Use `len2d()` from
+  `physics/engine.ts` (sqrt/mul/add are IEEE-exact everywhere). The smoke
+  suite's "lerp determinism" test guards the render side of this.
 - **Crashes are geometric, not jolt-based.** Compression never breaks the
   rider loose — bumps, kinks and hard flat landings are survivable by
   construction. Wipeouts: inverted landing, head-on slam where motion is

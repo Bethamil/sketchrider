@@ -42,7 +42,10 @@ function seedStarterTrack(): void {
   const pts: Array<[number, number]> = [];
   for (let i = 0; i <= n; i++) {
     const t = i / n;
-    pts.push([-120 + t * 760, 34 + t * 250 - Math.sin(t * Math.PI) * 62]);
+    // Math.sin differs across JS engines in the last bits; round so every
+    // browser seeds the exact same track.
+    const y = Math.round((34 + t * 250 - Math.sin(t * Math.PI) * 62) * 100) / 100;
+    pts.push([-120 + t * 760, y]);
   }
   for (let i = 0; i < n; i++) {
     game.store.add('normal', pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);

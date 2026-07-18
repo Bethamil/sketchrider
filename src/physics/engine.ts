@@ -61,8 +61,18 @@ export function makePoint(x: number, y: number, friction: number): PPoint {
   return { x, y, px: x, py: y, friction };
 }
 
+/**
+ * Cross-browser deterministic length. Math.hypot is NOT correctly rounded
+ * and differs between V8 and SpiderMonkey in the last bits — enough to make
+ * the same track ride differently per browser. sqrt/mul/add are IEEE-exact
+ * everywhere. Physics code must use this, never Math.hypot.
+ */
+export function len2d(dx: number, dy: number): number {
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
 export function makeStick(a: PPoint, b: PPoint, breakable = false, checked = breakable): Stick {
-  return { a, b, rest: Math.hypot(b.x - a.x, b.y - a.y), breakable, broken: false, checked };
+  return { a, b, rest: len2d(b.x - a.x, b.y - a.y), breakable, broken: false, checked };
 }
 
 export class Engine {
@@ -108,7 +118,7 @@ export class Engine {
   private solveStick(s: Stick, index: number): void {
     const dx = s.b.x - s.a.x;
     const dy = s.b.y - s.a.y;
-    const d = Math.hypot(dx, dy);
+    const d = len2d(dx, dy);
     if (d < 1e-9) return;
     const diff = ((d - s.rest) / d) * 0.5;
     if (s.checked && diff > 0) {
@@ -129,7 +139,7 @@ export class Engine {
 
   private collidePoint(p: PPoint, store: LineStore): void {
     // Query covers the whole motion path so fast points can't outrun it.
-    const travel = Math.hypot(p.x - p.px, p.y - p.py);
+    const travel = len2d(p.x - p.px, p.y - p.py);
     const nearby = store.query(p.x, p.y, MAX_PENETRATION + travel);
     for (const l of nearby) {
       const type = getLineType(l.type);

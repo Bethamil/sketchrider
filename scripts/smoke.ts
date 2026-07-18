@@ -118,11 +118,15 @@ expectCrash('slow wall bonk', false, (s) => {
 
 // ---- wipeouts -------------------------------------------------------------
 
+// NOTE: chaotic scenario — the amplitude is tuned so the rider goes airborne
+// and lands rotated. Last-ulp numeric changes can flip it; if it stops
+// crashing after a legitimate change, re-sweep amplitudes (36-48) and pick
+// one that crashes at a stable step. Tuned for exact-rounded len2d math.
 expectCrash('rotated tail landing', true, (s) => {
   let px = -100,
     py = 30;
   for (let x = -50; x < 3000; x += 50) {
-    const y = 30 + (x + 100) * 0.35 + Math.sin(x * 0.01) * 40;
+    const y = 30 + (x + 100) * 0.35 + Math.sin(x * 0.01) * 44;
     s.add('normal', px, py, x, y);
     px = x;
     py = y;

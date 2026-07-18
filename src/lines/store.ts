@@ -28,7 +28,9 @@ export function makeLine(
   x2: number,
   y2: number,
 ): TrackLine | null {
-  const len = Math.hypot(x2 - x1, y2 - y1);
+  // sqrt, not Math.hypot: line geometry feeds the physics, and hypot is not
+  // cross-engine deterministic (see len2d in physics/engine.ts).
+  const len = Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1));
   if (len < 0.25) return null;
   const dx = (x2 - x1) / len;
   const dy = (y2 - y1) / len;

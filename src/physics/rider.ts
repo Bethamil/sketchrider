@@ -1,4 +1,4 @@
-import { makePoint, makeStick, type Contact, type PPoint, type Stick } from './engine';
+import { len2d, makePoint, makeStick, type Contact, type PPoint, type Stick } from './engine';
 
 /**
  * The rider: a sketchy figure on a sled. Two runner points touch the
@@ -185,7 +185,7 @@ export class Rider {
     const nose = this.points.nose;
     let dx = nose.x - tail.x;
     let dy = nose.y - tail.y;
-    const len = Math.hypot(dx, dy) || 1;
+    const len = len2d(dx, dy) || 1;
     dx /= len;
     dy /= len;
     const ux = dy; // sled "up"
@@ -291,7 +291,7 @@ export class Rider {
       for (const n of this.scarf) {
         const dx = n.x - ax;
         const dy = n.y - ay;
-        const d = Math.hypot(dx, dy) || 1;
+        const d = len2d(dx, dy) || 1;
         const diff = (d - SCARF_REST) / d;
         n.x -= dx * diff;
         n.y -= dy * diff;
