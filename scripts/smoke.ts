@@ -174,6 +174,56 @@ expectCrash('face-first ramp', true, (s) => {
   );
 }
 
+{
+  // Determinism: interleaving render interpolation (beginLerp/endLerp)
+  // between steps must leave the sim bit-identical to a clean run. This
+  // regressed once (f32 save buffers truncated the f64 state), which made
+  // rides differ per display refresh rate.
+  const track = (s: LineStore) => {
+    let px = -100,
+      py = 30;
+    for (let x = -50; x < 3000; x += 50) {
+      const y = 30 + (x + 100) * 0.32 + Math.sin(x * 0.012) * 35;
+      s.add('normal', px, py, x, y);
+      px = x;
+      py = y;
+    }
+  };
+  const run = (lerpEvery: boolean): Rider => {
+    const store = new LineStore();
+    track(store);
+    const engine = new Engine();
+    const rider = new Rider();
+    rider.reset(0, 0);
+    for (let i = 0; i < 600; i++) {
+      rider.capturePrev();
+      engine.step(rider.allPoints, rider.sticks, store);
+      rider.updateScarf();
+      if (lerpEvery) {
+        // Fake three renders at awkward alphas, like a 240 Hz display.
+        for (const a of [0.21, 0.63, 0.87]) {
+          rider.beginLerp(a);
+          rider.endLerp();
+        }
+      }
+    }
+    return rider;
+  };
+  const clean = run(false);
+  const lerped = run(true);
+  let maxDiff = 0;
+  for (let i = 0; i < clean.allPoints.length; i++) {
+    maxDiff = Math.max(
+      maxDiff,
+      Math.abs(clean.allPoints[i].x - lerped.allPoints[i].x),
+      Math.abs(clean.allPoints[i].y - lerped.allPoints[i].y),
+    );
+  }
+  const ok = maxDiff === 0;
+  if (!ok) failures++;
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${'lerp determinism'.padEnd(20)} maxDiff=${maxDiff}`);
+}
+
 if (failures > 0) {
   console.error(`SMOKE FAIL: ${failures} scenario(s)`);
   process.exit(1);

@@ -36,9 +36,12 @@ export class Rider {
   readonly scarf: ScarfNode[] = [];
   crashed = false;
 
-  /** Positions at the start of the last step — the render-interpolation baseline. */
-  private prevState!: Float32Array;
-  private lerpSave!: Float32Array;
+  /** Positions at the start of the last step — the render-interpolation baseline.
+   *  MUST be Float64: state round-trips through these buffers every rendered
+   *  frame, and truncating to f32 would perturb the sim differently per
+   *  display refresh rate, breaking run-to-run determinism. */
+  private prevState!: Float64Array;
+  private lerpSave!: Float64Array;
   private lerping = false;
 
   constructor() {
@@ -72,8 +75,8 @@ export class Rider {
       this.scarf.push({ x: 0, y: 0, px: 0, py: 0 });
     }
     const n = (this.allPoints.length + this.scarf.length) * 4;
-    this.prevState = new Float32Array(n);
-    this.lerpSave = new Float32Array(n);
+    this.prevState = new Float64Array(n);
+    this.lerpSave = new Float64Array(n);
     this.reset(0, 0);
   }
 
@@ -97,7 +100,7 @@ export class Rider {
     this.capturePrev();
   }
 
-  private writeState(out: Float32Array): void {
+  private writeState(out: Float64Array): void {
     let i = 0;
     for (const p of this.allPoints) {
       out[i++] = p.x;
